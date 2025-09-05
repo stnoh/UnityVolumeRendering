@@ -161,7 +161,7 @@ namespace UnityVolumeRendering
                     {
                         ImportImageFileDataset(volrendObj, (VolumeDataset dataset) =>
                         {
-                            TransferFunction secondaryTransferFunction = ScriptableObject.CreateInstance<TransferFunction>();
+                            secondaryTransferFunction = ScriptableObject.CreateInstance<TransferFunction>();
                             secondaryTransferFunction.colourControlPoints = new List<TFColourControlPoint>() { new TFColourControlPoint(0.0f, Color.red), new TFColourControlPoint(1.0f, Color.red) };
                             secondaryTransferFunction.GenerateTexture();
                             volrendObj.SetOverlayDataset(dataset);
@@ -172,7 +172,7 @@ namespace UnityVolumeRendering
                     {
                         ImportDicomDataset(volrendObj, (VolumeDataset dataset) =>
                         {
-                            TransferFunction secondaryTransferFunction = ScriptableObject.CreateInstance<TransferFunction>();
+                            secondaryTransferFunction = ScriptableObject.CreateInstance<TransferFunction>();
                             secondaryTransferFunction.colourControlPoints = new List<TFColourControlPoint>() { new TFColourControlPoint(0.0f, Color.red), new TFColourControlPoint(1.0f, Color.red) };
                             secondaryTransferFunction.GenerateTexture();
                             volrendObj.SetOverlayDataset(dataset);
