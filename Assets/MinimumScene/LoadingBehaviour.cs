@@ -74,21 +74,15 @@ public class LoadingBehaviour : MonoBehaviour
         meshRenderer.sharedMaterial = new Material(meshRenderer.sharedMaterial);
         volObj.meshRenderer = meshRenderer;
         volObj.dataset = dataset;
+        volObj.SetRenderMode(UnityVolumeRendering.RenderMode.IsosurfaceRendering);
 
         TransferFunction tf;
-        if (false) {
-            volObj.SetRenderMode(UnityVolumeRendering.RenderMode.DirectVolumeRendering);
-            tf = TransferFunctionDatabase.CreateTransferFunction();
-        }
-        else {
-            volObj.SetRenderMode(UnityVolumeRendering.RenderMode.IsosurfaceRendering);
 
-            tf = ScriptableObject.CreateInstance<TransferFunction>();
-            tf.AddControlPoint(new TFColourControlPoint(0.0f, Color.gray));
-            tf.AddControlPoint(new TFColourControlPoint(0.0f, Color.gray));
-            tf.AddControlPoint(new TFAlphaControlPoint(0.0f, 0.0f));
-            tf.AddControlPoint(new TFAlphaControlPoint(1.0f, 1.0f));
-        }
+        tf = ScriptableObject.CreateInstance<TransferFunction>();
+        tf.AddControlPoint(new TFColourControlPoint(0.0f, Color.gray));
+        tf.AddControlPoint(new TFColourControlPoint(0.0f, Color.gray));
+        tf.AddControlPoint(new TFAlphaControlPoint(0.0f, 0.0f));
+        tf.AddControlPoint(new TFAlphaControlPoint(1.0f, 1.0f));
 
         Texture2D tfTexture = tf.GetTexture();
         volObj.transferFunction = tf;
@@ -100,7 +94,7 @@ public class LoadingBehaviour : MonoBehaviour
 
         meshRenderer.sharedMaterial.DisableKeyword("MODE_DVR");
         meshRenderer.sharedMaterial.DisableKeyword("MODE_MIP");
-        meshRenderer.sharedMaterial.DisableKeyword("MODE_SURF");
+        meshRenderer.sharedMaterial.EnableKeyword("MODE_SURF");
 
         meshContainer.transform.localScale = dataset.scale;
         meshContainer.transform.localRotation = dataset.rotation;
