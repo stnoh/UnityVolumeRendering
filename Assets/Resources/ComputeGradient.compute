@@ -1,0 +1,51 @@
+﻿#pragma kernel CentralDifferenceGrad
+
+// parameters
+uint3 Dims;
+float minValue;
+float maxRange;
+
+Texture2D<half> InputTex3D_as2D;
+RWTexture2D<half4> OutputTex3D_as2D;
+
+[numthreads(8, 8, 8)]
+void CentralDifferenceGrad(uint3 id : SV_DispatchThreadID)
+{
+    // 3D coordinate
+    uint xp = min(id.x + 1, Dims.x - 1);
+    uint xm = max(id.x - 1, 0);
+    uint yp = min(id.y + 1, Dims.y - 1);
+    uint ym = max(id.y - 1, 0);
+    uint zp = min(id.z + 1, Dims.z - 1);
+    uint zm = max(id.z - 1, 0);
+
+    // 2D coordinate
+    uint dimZX = (uint)sqrt(Dims.z);
+    //uint dimZY = (uint)(Dims.z + dimZX - 1) / dimZX; // not used
+
+    uint bx = id.z % dimZX;
+    uint by = id.z / dimZX;
+
+    float x1 = InputTex3D_as2D[uint2(xp + bx * Dims.x, id.y + by * Dims.y)] - minValue;
+    float x2 = InputTex3D_as2D[uint2(xm + bx * Dims.x, id.y + by * Dims.y)] - minValue;
+    float y1 = InputTex3D_as2D[uint2(id.x + bx * Dims.x, yp + by * Dims.y)] - minValue;
+    float y2 = InputTex3D_as2D[uint2(id.x + bx * Dims.x, ym + by * Dims.y)] - minValue;
+
+    uint bx_p = zp % dimZX;
+    uint by_p = zp / dimZX;
+    float z1 = InputTex3D_as2D[uint2(id.x + bx_p * Dims.x, id.y + by_p * Dims.y)] - minValue;
+
+    uint bx_m = zm % dimZX;
+    uint by_m = zm / dimZX;
+    float z2 = InputTex3D_as2D[uint2(id.x + bx_m * Dims.x, id.y + by_m * Dims.y)] - minValue;
+
+    float dx = (float)(x2 - x1) / maxRange;
+    float dy = (float)(y2 - y1) / maxRange;
+    float dz = (float)(z2 - z1) / maxRange;
+
+    uint2 tex_loc = uint2(id.x + bx * Dims.x, id.y + by * Dims.y);
+
+    float a = (float)(InputTex3D_as2D[tex_loc] - minValue) / maxRange;
+
+    OutputTex3D_as2D[tex_loc] = half4(dx, dy, dz, a);
+}

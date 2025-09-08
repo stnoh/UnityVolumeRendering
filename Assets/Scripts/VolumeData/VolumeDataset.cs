@@ -431,6 +431,7 @@ namespace UnityVolumeRendering
                 return textureTmp;
             }
 
+#if false
             progressHandler.StartStage(0.6f, "Creating gradient texture");
             await Task.Run(() => {
                 GradientComputator gradientComputator = GradientComputatorFactory.CreateGradientComputator(this, gradientType);
@@ -456,12 +457,35 @@ namespace UnityVolumeRendering
                 }
             });
             progressHandler.EndStage();
+#endif
 
             progressHandler.StartStage(0.2f, "Uploading gradient texture");
             Texture2D texture = new Texture2D(dimX * dimZX, dimY * dimZY, texformat, false);
             texture.wrapMode = TextureWrapMode.Clamp;
+#if false
             texture.SetPixels(cols);
             texture.Apply(false, true);
+#else
+            RenderTexture renderTexture = new RenderTexture(dimX * dimZX, dimY * dimZY, 0, RenderTextureFormat.ARGBHalf);
+            renderTexture.enableRandomWrite = true;
+            renderTexture.Create();
+
+            var compute = Resources.Load<ComputeShader>("ComputeGradient");
+            compute.SetInts("Dims", new int[] { dimX, dimY, dimZ });
+            compute.SetFloat("minValue", minValue / 255.0f);
+            compute.SetFloat("maxRange", maxRange / 255.0f);
+            compute.SetTexture(0, "InputTex3D_as2D", dataTexture);
+            compute.SetTexture(0, "OutputTex3D_as2D", renderTexture);
+            compute.Dispatch(0, dimX / 8, dimY / 8, dimZ / 8);
+
+            // from RenderTexture (GPU) to Texture2D (GPU)
+            RenderTexture.active = renderTexture;
+            texture.ReadPixels(new Rect(0, 0, renderTexture.width, renderTexture.height), 0, 0);
+            texture.Apply();
+            RenderTexture.active = null;
+
+            renderTexture.DiscardContents();
+#endif
             progressHandler.EndStage();
 
             Debug.Log("Gradient gereneration done.");
