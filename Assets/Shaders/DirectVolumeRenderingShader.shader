@@ -119,7 +119,7 @@
                 float stepSize;
             };
 
-            float tex3Dlod_float(sampler2D tex3D_as2D, float4 pos)
+            float4 tex3Dlod_custom(sampler2D tex3D_as2D, float4 pos)
             {
                 // 3D -> 2D
                 uint dimZX = (uint)sqrt(_TextureSize.z);
@@ -150,8 +150,8 @@
                 float2 uv0 = float2(u0 / TEXTURE_WIDTH, v0 / TEXTURE_HEIGHT);
                 float2 uv1 = float2(u1 / TEXTURE_WIDTH, v1 / TEXTURE_HEIGHT);
 
-                float sample0 = tex2Dlod(tex3D_as2D, float4(uv0, 0.0f, 0.0f));
-                float sample1 = tex2Dlod(tex3D_as2D, float4(uv1, 0.0f, 0.0f));
+                float4 sample0 = tex2Dlod(tex3D_as2D, float4(uv0, 0.0f, 0.0f));
+                float4 sample1 = tex2Dlod(tex3D_as2D, float4(uv1, 0.0f, 0.0f));
 
                 // we need manual because using Texture2D 
                 return lerp(sample0, sample1, frac(z));
@@ -255,7 +255,7 @@
 #if CUBIC_INTERPOLATION_ON
                 return interpolateTricubicFast(_DataTex, float3(pos.x, pos.y, pos.z), _TextureSize);
 #else
-                return tex3Dlod_float(_DataTex, float4(pos.x, pos.y, pos.z, 0.0f));
+                return tex3Dlod_custom(_DataTex, float4(pos.x, pos.y, pos.z, 0.0f));
 #endif
             }
 
@@ -268,7 +268,7 @@
             // Gets the density at the specified position, without tricubic interpolation
             float getDensityNoTricubic(float3 pos)
             {
-                return tex3Dlod_float(_DataTex, float4(pos.x, pos.y, pos.z, 0.0f));
+                return tex3Dlod_custom(_DataTex, float4(pos.x, pos.y, pos.z, 0.0f));
             }
 
             // Gets the gradient at the specified position
@@ -314,7 +314,7 @@
 #if CUBIC_INTERPOLATION_ON
                 return interpolateTricubicFast(_ShadowVolume, float3(pos.x, pos.y, pos.z), _ShadowVolumeTextureSize);
 #else
-                return tex3Dlod_float(_ShadowVolume, float4(pos.x, pos.y, pos.z, 0.0f));
+                return tex3Dlod_custom(_ShadowVolume, float4(pos.x, pos.y, pos.z, 0.0f));
 #endif
             }
 
