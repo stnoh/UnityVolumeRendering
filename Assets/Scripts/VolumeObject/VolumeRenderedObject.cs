@@ -534,9 +534,9 @@ namespace UnityVolumeRendering
             try
             {
                 bool useGradientTexture = NeedsGradients();
-                Texture3D dataTexture = await dataset.GetDataTextureAsync(progressHandler);
+                Texture2D dataTexture = await dataset.GetDataTextureAsync(progressHandler);
                 Texture3D gradientTexture = useGradientTexture ? await dataset.GetGradientTextureAsync(progressHandler) : null;
-                Texture3D secondaryDataTexture = secondaryDataset ? await secondaryDataset?.GetDataTextureAsync(progressHandler) : null;
+                Texture2D secondaryDataTexture = secondaryDataset ? await secondaryDataset?.GetDataTextureAsync(progressHandler) : null;
                 UpdateMatInternal(dataTexture, gradientTexture, secondaryDataTexture);
             }
             finally
@@ -545,7 +545,7 @@ namespace UnityVolumeRendering
             }
         }
 
-        private void UpdateMatInternal(Texture3D dataTexture, Texture3D gradientTexture, Texture3D secondaryDataTexture)
+        private void UpdateMatInternal(Texture2D dataTexture, Texture3D gradientTexture, Texture2D secondaryDataTexture)
         {
             if (dataTexture != null)
             {

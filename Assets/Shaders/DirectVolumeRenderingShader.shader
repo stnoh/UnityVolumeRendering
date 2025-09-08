@@ -2,11 +2,11 @@
 {
     Properties
     {
-        _DataTex ("Data Texture (Generated)", 3D) = "" {}
+        _DataTex ("Data Texture (Generated)", 2D) = "" {}
         _GradientTex("Gradient Texture (Generated)", 3D) = "" {}
         _NoiseTex("Noise Texture (Generated)", 2D) = "white" {}
         _TFTex("Transfer Function Texture (Generated)", 2D) = "" {}
-        _ShadowVolume("Shadow volume Texture (Generated)", 3D) = "" {}
+        _ShadowVolume("Shadow volume Texture (Generated)", 2D) = "" {}
         _SamplingRateMultiplier("Sampling rate multiplier", Range(0.2, 2.0)) = 1.0
         _MinVal("Min val", Range(0.0, 1.0)) = 0.0
         _MaxVal("Max val", Range(0.0, 1.0)) = 1.0
@@ -75,11 +75,11 @@
 #endif
             };
 
-            sampler3D _DataTex;
+            sampler2D _DataTex;
             sampler3D _GradientTex;
             sampler2D _NoiseTex;
             sampler2D _TFTex;
-            sampler3D _ShadowVolume;
+            sampler2D _ShadowVolume;
             sampler3D _SecondaryDataTex;
             sampler2D _SecondaryTFTex;
 
@@ -118,6 +118,44 @@
                 float numStepsRecip;
                 float stepSize;
             };
+
+            float tex3Dlod_float(sampler2D tex3D_as2D, float4 pos)
+            {
+                // 3D -> 2D
+                uint dimZX = (uint)sqrt(_TextureSize.z);
+                uint dimZY = (uint)(_TextureSize.z + dimZX - 1) / dimZX;
+                float TEXTURE_WIDTH  = _TextureSize.x * dimZX;
+                float TEXTURE_HEIGHT = _TextureSize.y * dimZY;
+
+                // texture coordinate [0.0:1.0]^3 to voxel coordinate [0,0,0] - [width-1,height-1,depth-1]
+                float x = pos.x * (_TextureSize.x - 1);
+                float y = pos.y * (_TextureSize.y - 1);
+                float z = pos.z * (_TextureSize.z - 1);
+
+                uint z0 = (int)floor(z);
+                uint z1 = min(z0 + 1, _TextureSize.z - 1);
+
+                // image 0
+                uint bx0 = z0 % dimZX;
+                uint by0 = z0 / dimZX;
+                float u0 = x + bx0 * _TextureSize.x;
+                float v0 = y + by0 * _TextureSize.y;
+
+                // image 1
+                uint bx1 = z1 % dimZX;
+                uint by1 = z1 / dimZX;
+                float u1 = x + bx1 * _TextureSize.x;
+                float v1 = y + by1 * _TextureSize.y;
+
+                float2 uv0 = float2(u0 / TEXTURE_WIDTH, v0 / TEXTURE_HEIGHT);
+                float2 uv1 = float2(u1 / TEXTURE_WIDTH, v1 / TEXTURE_HEIGHT);
+
+                float sample0 = tex2Dlod(tex3D_as2D, float4(uv0, 0.0f, 0.0f));
+                float sample1 = tex2Dlod(tex3D_as2D, float4(uv1, 0.0f, 0.0f));
+
+                // we need manual because using Texture2D 
+                return lerp(sample0, sample1, frac(z));
+            }
 
             float3 getViewRayDir(float3 vertexLocal)
             {
@@ -217,7 +255,7 @@
 #if CUBIC_INTERPOLATION_ON
                 return interpolateTricubicFast(_DataTex, float3(pos.x, pos.y, pos.z), _TextureSize);
 #else
-                return tex3Dlod(_DataTex, float4(pos.x, pos.y, pos.z, 0.0f));
+                return tex3Dlod_float(_DataTex, float4(pos.x, pos.y, pos.z, 0.0f));
 #endif
             }
 
@@ -230,7 +268,7 @@
             // Gets the density at the specified position, without tricubic interpolation
             float getDensityNoTricubic(float3 pos)
             {
-                return tex3Dlod(_DataTex, float4(pos.x, pos.y, pos.z, 0.0f));
+                return tex3Dlod_float(_DataTex, float4(pos.x, pos.y, pos.z, 0.0f));
             }
 
             // Gets the gradient at the specified position
@@ -276,7 +314,7 @@
 #if CUBIC_INTERPOLATION_ON
                 return interpolateTricubicFast(_ShadowVolume, float3(pos.x, pos.y, pos.z), _ShadowVolumeTextureSize);
 #else
-                return tex3Dlod(_ShadowVolume, float4(pos.x, pos.y, pos.z, 0.0f));
+                return tex3Dlod_float(_ShadowVolume, float4(pos.x, pos.y, pos.z, 0.0f));
 #endif
             }
 

@@ -69,7 +69,7 @@ namespace UnityVolumeRendering
             uint[] histogramData = new uint[sampleCount];
             Color32[] histogramCols = new Color32[sampleCount];
 
-            Texture3D dataTexture = dataset.GetDataTexture();
+            Texture2D dataTexture = dataset.GetDataTexture();
 
             if (handleInitialize < 0 || handleMain < 0)
             {
@@ -77,13 +77,13 @@ namespace UnityVolumeRendering
             }
 
             computeHistogram.SetFloat("ValueRange", (float)(sampleCount - 1));
-            computeHistogram.SetInts("Dimension", new int[] { dataTexture.width, dataTexture.height, dataTexture.depth });
+            computeHistogram.SetInts("Dimension", new int[] { dataTexture.width, dataTexture.height });
             computeHistogram.SetTexture(handleMain, "VolumeTexture", dataTexture);
             computeHistogram.SetBuffer(handleMain, "HistogramBuffer", histogramBuffer);
             computeHistogram.SetBuffer(handleInitialize, "HistogramBuffer", histogramBuffer);
 
             computeHistogram.Dispatch(handleInitialize, sampleCount / 8, 1, 1);
-            computeHistogram.Dispatch(handleMain, (dataTexture.width + 7) / 8, (dataTexture.height + 7) / 8, (dataTexture.depth + 7) / 8);
+            computeHistogram.Dispatch(handleMain, (dataTexture.width + 7) / 8, (dataTexture.height + 7) / 8, 1);
 
             histogramBuffer.GetData(histogramData);
 

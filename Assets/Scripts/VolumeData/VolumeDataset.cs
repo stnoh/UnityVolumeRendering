@@ -36,7 +36,7 @@ namespace UnityVolumeRendering
         private float minDataValue = float.MaxValue;
         private float maxDataValue = float.MinValue;
 
-        private Texture3D dataTexture = null;
+        private Texture2D dataTexture = null;
         private Texture3D gradientTexture = null;
 
         private SemaphoreSlim createDataTextureLock = new SemaphoreSlim(1, 1);
@@ -61,11 +61,11 @@ namespace UnityVolumeRendering
         /// Will create the data texture if it does not exist. This may be slow (consider using <see cref="GetDataTextureAsync"/>).
         /// </summary>
         /// <returns>3D texture of dataset</returns>
-        public Texture3D GetDataTexture()
+        public Texture2D GetDataTexture()
         {
             if (dataTexture == null)
             {
-                dataTexture = AsyncHelper.RunSync<Texture3D>(() => CreateTextureInternalAsync(NullProgressHandler.instance));
+                dataTexture = AsyncHelper.RunSync<Texture2D>(() => CreateTextureInternalAsync(NullProgressHandler.instance));
                 return dataTexture;
             }
             else
@@ -76,7 +76,7 @@ namespace UnityVolumeRendering
 
         public void RecreateDataTexture()
         {
-            dataTexture = AsyncHelper.RunSync<Texture3D>(() => CreateTextureInternalAsync(NullProgressHandler.instance));
+            dataTexture = AsyncHelper.RunSync<Texture2D>(() => CreateTextureInternalAsync(NullProgressHandler.instance));
         }
 
         /// <summary>
@@ -85,7 +85,7 @@ namespace UnityVolumeRendering
         /// </summary>
         /// <param name="progressHandler">Progress handler for tracking the progress of the texture creation (optional).</param>
         /// <returns>Async task returning a 3D texture of the dataset</returns>
-        public async Task<Texture3D> GetDataTextureAsync(IProgressHandler progressHandler = null)
+        public async Task<Texture2D> GetDataTextureAsync(IProgressHandler progressHandler = null)
         {
             if (dataTexture == null)
             {
@@ -247,11 +247,11 @@ namespace UnityVolumeRendering
             }
         }
 
-        private async Task<Texture3D> CreateTextureInternalAsync(IProgressHandler progressHandler)                                        
+        private async Task<Texture2D> CreateTextureInternalAsync(IProgressHandler progressHandler)                                        
         {
             Debug.Log("Async texture generation. Hold on.");
 
-            Texture3D.allowThreadedTextureCreation = true;
+            Texture2D.allowThreadedTextureCreation = true;
             TextureFormat texformat = SystemInfo.SupportsTextureFormat(TextureFormat.RHalf) ? TextureFormat.RHalf : TextureFormat.RFloat;
 
             float minValue = 0;
@@ -267,8 +267,11 @@ namespace UnityVolumeRendering
             });
             progressHandler.EndStage();
 
-            Texture3D texture = null;
+            Texture2D texture = null;
             bool isHalfFloat = texformat == TextureFormat.RHalf;
+
+            int dimZX = (int)Math.Sqrt(dimZ);
+            int dimZY = (dimZ + dimZX - 1) / dimZX;
 
             progressHandler.StartStage(0.8f, "Creating texture");
             try
@@ -282,19 +285,29 @@ namespace UnityVolumeRendering
                     NativeArray<ushort> pixelBytes = new NativeArray<ushort>(data.Length, Allocator.Persistent);
 
                     await Task.Run(() => {
-                        for (int i = 0; i < dimension;)
+
+                        // quick fix for Texture2D
+                        int i = 0;
+                        for (int by = 0; by < dimZY; by++)
+                        for (int bx = 0; bx < dimZX; bx++)
                         {
                             progressHandler.ReportProgress(i, dimension, "Copying slice data.");
-                            for (int j = 0; j < sliceDimension; j++, i++)
+
+                            for (int y = 0; y < dimY; y++)
+                            for (int x = 0; x < dimX; x++)
                             {
-                                pixelBytes[i] = Mathf.FloatToHalf((float)(data[i] - minValue) / maxRange);
+                                int u = x + bx * dimX;
+                                int v = y + by * dimY;
+                                int idx = u + v * dimX * dimZX;
+                                pixelBytes[idx] = Mathf.FloatToHalf((float)(data[i] - minValue) / maxRange);
+                                i++;
                             }
                         }
                     });
                     progressHandler.EndStage();
                     progressHandler.ReportProgress(0.8f, "Applying texture");
 
-                    texture = new Texture3D(dimX, dimY, dimZ, texformat, false);
+                    texture = new Texture2D(dimX * dimZX, dimZ * dimZY, texformat, false);
                     texture.wrapMode = TextureWrapMode.Clamp;
                     texture.SetPixelData(pixelBytes, 0);
                     texture.Apply(false, true);
@@ -319,7 +332,7 @@ namespace UnityVolumeRendering
                     progressHandler.EndStage();
                     progressHandler.ReportProgress(0.8f, "Applying texture");
 
-                    texture = new Texture3D(dimX, dimY, dimZ, texformat, false);
+                    texture = new Texture2D(dimX * dimZX, dimZ * dimZY, texformat, false);
                     texture.wrapMode = TextureWrapMode.Clamp;
                     texture.SetPixelData(pixelBytes, 0);
                     texture.Apply(false, true);
@@ -328,15 +341,24 @@ namespace UnityVolumeRendering
             }
             catch (OutOfMemoryException)
             {
-                texture = new Texture3D(dimX, dimY, dimZ, texformat, false);               
+                texture = new Texture2D(dimX * dimZX, dimZ * dimZY, texformat, false);
                 texture.wrapMode = TextureWrapMode.Clamp;
 
 
                 Debug.LogWarning("Out of memory when creating texture. Using fallback method.");
-                for (int x = 0; x < dimX; x++)
-                    for (int y = 0; y < dimY; y++)
-                        for (int z = 0; z < dimZ; z++)
-                            texture.SetPixel(x, y, z, new Color((float)(data[x + y * dimX + z * (dimX * dimY)] - minValue) / maxRange, 0.0f, 0.0f, 0.0f));
+
+                // [CHECK ME LATER]
+                for (int v = 0; v < dimY * dimZY; v++)
+                for (int u = 0; u < dimX * dimZX; u++)
+                {
+                    int bx = u / dimZX;
+                    int by = v / dimZY;
+                    int x  = u % dimZX;
+                    int y  = v % dimZY;
+                    int z = bx + by * dimZX;
+
+                    texture.SetPixel(u, v, new Color((float)(data[x + y * dimX + z * (dimX * dimY)] - minValue) / maxRange, 0.0f, 0.0f, 0.0f));
+                }
 
                 texture.Apply(false, true);
             }

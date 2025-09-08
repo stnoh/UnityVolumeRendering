@@ -94,11 +94,13 @@ namespace UnityVolumeRendering
             volumeRenderedObject = GetComponent<VolumeRenderedObject>();
             Debug.Assert(volumeRenderedObject != null);
 
+            // [FIX ME LATER]
+            Debug.LogWarning("WARNING: shadow volume does not work now. Please fix me later.");
             Vector3Int shadowVolumeDimensions = new Vector3Int(512, 512, 512);
             
             shadowVolumeTexture = new RenderTexture(shadowVolumeDimensions.x, shadowVolumeDimensions.y, 0, RenderTextureFormat.RHalf, RenderTextureReadWrite.Linear);
-            shadowVolumeTexture.dimension = TextureDimension.Tex3D;
-            shadowVolumeTexture.volumeDepth = shadowVolumeDimensions.z;
+            //shadowVolumeTexture.dimension = TextureDimension.Tex3D;
+            //shadowVolumeTexture.volumeDepth = shadowVolumeDimensions.z;
             shadowVolumeTexture.enableRandomWrite = true;
             shadowVolumeTexture.wrapMode = TextureWrapMode.Clamp;
             shadowVolumeTexture.Create();
@@ -155,7 +157,7 @@ namespace UnityVolumeRendering
         {
             VolumeDataset dataset = volumeRenderedObject.dataset;
             
-            Texture3D dataTexture = dataset.GetDataTexture();
+            Texture2D dataTexture = dataset.GetDataTexture();
             
 #if UNITY_2020_2_OR_NEWER
             if (volumeRenderedObject.GetCubicInterpolationEnabled())
