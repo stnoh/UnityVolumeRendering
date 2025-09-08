@@ -3,7 +3,7 @@
     Properties
     {
         _DataTex ("Data Texture (Generated)", 2D) = "" {}
-        _GradientTex("Gradient Texture (Generated)", 3D) = "" {}
+        _GradientTex("Gradient Texture (Generated)", 2D) = "" {}
         _NoiseTex("Noise Texture (Generated)", 2D) = "white" {}
         _TFTex("Transfer Function Texture (Generated)", 2D) = "" {}
         _ShadowVolume("Shadow volume Texture (Generated)", 2D) = "" {}
@@ -13,7 +13,7 @@
         _MinGradient("Gradient visibility threshold", Range(0.0, 1.0)) = 0.0
         _LightingGradientThresholdStart("Gradient threshold for lighting (end)", Range(0.0, 1.0)) = 0.0
         _LightingGradientThresholdEnd("Gradient threshold for lighting (start)", Range(0.0, 1.0)) = 0.0
-        _SecondaryDataTex ("Secondary Data Texture (Generated)", 3D) = "" {}
+        _SecondaryDataTex ("Secondary Data Texture (Generated)", 2D) = "" {}
         _SecondaryTFTex("Transfer Function Texture for secondary volume", 2D) = "" {}
         [HideInInspector] _ShadowVolumeTextureSize("Shadow volume dimensions", Vector) = (1, 1, 1)
         [HideInInspector] _TextureSize("Dataset dimensions", Vector) = (1, 1, 1)
@@ -76,11 +76,11 @@
             };
 
             sampler2D _DataTex;
-            sampler3D _GradientTex;
+            sampler2D _GradientTex;
             sampler2D _NoiseTex;
             sampler2D _TFTex;
             sampler2D _ShadowVolume;
-            sampler3D _SecondaryDataTex;
+            sampler2D _SecondaryDataTex;
             sampler2D _SecondaryTFTex;
 
             float _MinVal;
@@ -262,7 +262,7 @@
             // Gets the density of the secondary volume at the specified position
             float getSecondaryDensity(float3 pos)
             {
-                return tex3Dlod(_SecondaryDataTex, float4(pos.x, pos.y, pos.z, 0.0f));
+                return tex3Dlod_custom(_SecondaryDataTex, float4(pos.x, pos.y, pos.z, 0.0f)).r;
             }
 
             // Gets the density at the specified position, without tricubic interpolation
@@ -277,7 +277,7 @@
 #if CUBIC_INTERPOLATION_ON
                 return interpolateTricubicFast(_GradientTex, float3(pos.x, pos.y, pos.z), _TextureSize).rgb;
 #else
-                return tex3Dlod(_GradientTex, float4(pos.x, pos.y, pos.z, 0.0f)).rgb;
+                return tex3Dlod_custom(_GradientTex, float4(pos.x, pos.y, pos.z, 0.0f)).rgb;
 #endif
             }
 

@@ -37,7 +37,7 @@ namespace UnityVolumeRendering
         private float maxDataValue = float.MinValue;
 
         private Texture2D dataTexture = null;
-        private Texture3D gradientTexture = null;
+        private Texture2D gradientTexture = null;
 
         private SemaphoreSlim createDataTextureLock = new SemaphoreSlim(1, 1);
         private SemaphoreSlim createGradientTextureLock = new SemaphoreSlim(1, 1);
@@ -109,11 +109,11 @@ namespace UnityVolumeRendering
         /// Will create the gradient texture if it does not exist. This may be slow (consider using <see cref="GetGradientTextureAsync" />).
         /// </summary>
         /// <returns>Gradient texture</returns>
-        public Texture3D GetGradientTexture()
+        public Texture2D GetGradientTexture()
         {
             if (gradientTexture == null)
             {
-                gradientTexture = AsyncHelper.RunSync<Texture3D>(() => CreateGradientTextureInternalAsync(GradientTypeUtils.GetDefaultGradientType(), NullProgressHandler.instance));
+                gradientTexture = AsyncHelper.RunSync<Texture2D>(() => CreateGradientTextureInternalAsync(GradientTypeUtils.GetDefaultGradientType(), NullProgressHandler.instance));
                 return gradientTexture;
             }
             else
@@ -122,7 +122,7 @@ namespace UnityVolumeRendering
             }
         }
 
-        public async Task<Texture3D> RegenerateGradientTextureAsync(GradientType gradientType, IProgressHandler progressHandler = null)
+        public async Task<Texture2D> RegenerateGradientTextureAsync(GradientType gradientType, IProgressHandler progressHandler = null)
         {
             await createGradientTextureLock.WaitAsync();
             try
@@ -151,7 +151,7 @@ namespace UnityVolumeRendering
         /// </summary>
         /// <param name="progressHandler">Progress handler for tracking the progress of the texture creation (optional).</param>
         /// <returns>Async task returning a 3D gradient texture of the dataset</returns>
-        public async Task<Texture3D> GetGradientTextureAsync(IProgressHandler progressHandler = null)
+        public async Task<Texture2D> GetGradientTextureAsync(IProgressHandler progressHandler = null)
         {
             if (gradientTexture == null)
             {
@@ -347,14 +347,13 @@ namespace UnityVolumeRendering
 
                 Debug.LogWarning("Out of memory when creating texture. Using fallback method.");
 
-                // [CHECK ME LATER]
                 for (int v = 0; v < dimY * dimZY; v++)
                 for (int u = 0; u < dimX * dimZX; u++)
                 {
-                    int bx = u / dimZX;
-                    int by = v / dimZY;
-                    int x  = u % dimZX;
-                    int y  = v % dimZY;
+                    int bx = u / dimX;
+                    int by = v / dimY;
+                    int x  = u % dimX;
+                    int y  = v % dimY;
                     int z = bx + by * dimZX;
 
                     texture.SetPixel(u, v, new Color((float)(data[x + y * dimX + z * (dimX * dimY)] - minValue) / maxRange, 0.0f, 0.0f, 0.0f));
@@ -367,11 +366,11 @@ namespace UnityVolumeRendering
             return texture;
         }
 
-        private async Task<Texture3D> CreateGradientTextureInternalAsync(GradientType gradientType, IProgressHandler progressHandler)
+        private async Task<Texture2D> CreateGradientTextureInternalAsync(GradientType gradientType, IProgressHandler progressHandler)
         {
             Debug.Log("Async gradient generation. Hold on.");
 
-            Texture3D.allowThreadedTextureCreation = true;
+            Texture2D.allowThreadedTextureCreation = true;
             TextureFormat texformat = SystemInfo.SupportsTextureFormat(TextureFormat.RGBAHalf) ? TextureFormat.RGBAHalf : TextureFormat.RGBAFloat;
 
             float minValue = 0;
@@ -389,6 +388,9 @@ namespace UnityVolumeRendering
             });
             progressHandler.EndStage();
 
+            int dimZX = (int)Math.Sqrt(dimZ);
+            int dimZY = (dimZ + dimZX - 1) / dimZX;
+
             try
             {
                 await Task.Run(() => cols = new Color[data.Length]);
@@ -396,23 +398,27 @@ namespace UnityVolumeRendering
             catch (OutOfMemoryException)
             {
                 progressHandler.StartStage(0.6f, "Creating gradient texture");
-                Texture3D textureTmp = new Texture3D(dimX, dimY, dimZ, texformat, false);
+                Texture2D textureTmp = new Texture2D(dimX * dimZX, dimY * dimZY, texformat, false);
                 textureTmp.wrapMode = TextureWrapMode.Clamp;
 
                 GradientComputator gradientComputator = GradientComputatorFactory.CreateGradientComputator(this, gradientType);
 
-                for (int x = 0; x < dimX; x++)
+                for (int v = 0; v < dimY * dimZY; v++)
                 {
-                    progressHandler.ReportProgress(x, dimX, "Calculating gradients for slice");
-                    for (int y = 0; y < dimY; y++)
-                    {
-                        for (int z = 0; z < dimZ; z++)
-                        {
-                            int iData = x + y * dimX + z * (dimX * dimY);
-                            Vector3 grad = gradientComputator.ComputeGradient(x, y, z, minValue, maxRange);
+                    progressHandler.ReportProgress(v, dimY * dimZY, "Calculating gradients for slice");
 
-                            textureTmp.SetPixel(x, y, z, new Color(grad.x, grad.y, grad.z, (float)(data[iData] - minValue) / maxRange));
-                        }
+                    for (int u = 0; u < dimX * dimZX; u++)
+                    {
+                        int bx = u / dimX;
+                        int by = v / dimY;
+                        int x  = u % dimX;
+                        int y  = v % dimY;
+                        int z = bx + by * dimZX;
+
+                        int iData = x + y * dimX + z * (dimX * dimY);
+                        Vector3 grad = gradientComputator.ComputeGradient(x, y, z, minValue, maxRange);
+
+                        textureTmp.SetPixel(u, v, new Color(grad.x, grad.y, grad.z, (float)(data[iData] - minValue) / maxRange));
                     }
                 }
                 progressHandler.EndStage();
@@ -429,25 +435,30 @@ namespace UnityVolumeRendering
             await Task.Run(() => {
                 GradientComputator gradientComputator = GradientComputatorFactory.CreateGradientComputator(this, gradientType);
 
-                for (int z = 0; z < dimZ; z++)
+                for (int v = 0; v < dimY * dimZY; v++)
                 {
-                    progressHandler.ReportProgress(z, dimZ, "Calculating gradients for slice");
-                    for (int y = 0; y < dimY; y++)
-                    {
-                        for (int x = 0; x < dimX; x++)
-                        {
-                            int iData = x + y * dimX + z * (dimX * dimY);
-                            Vector3 grad = gradientComputator.ComputeGradient(x, y, z, minValue, maxRange);
+                    progressHandler.ReportProgress(v, dimY * dimZY, "Calculating gradients for slice");
 
-                            cols[iData] = new Color(grad.x, grad.y, grad.z, (float)(data[iData] - minValue) / maxRange);
-                        }
+                    for (int u = 0; u < dimX * dimZX; u++)
+                    {
+                        int bx = u / dimX;
+                        int by = v / dimY;
+                        int x  = u % dimX;
+                        int y  = v % dimY;
+                        int z = bx + by * dimZX;
+                        int idx = u + v * dimX * dimZX;
+
+                        int iData = x + y * dimX + z * (dimX * dimY);
+                        Vector3 grad = gradientComputator.ComputeGradient(x, y, z, minValue, maxRange);
+
+                        cols[idx] = new Color(grad.x, grad.y, grad.z, (float)(data[iData] - minValue) / maxRange);
                     }
                 }
             });
             progressHandler.EndStage();
 
             progressHandler.StartStage(0.2f, "Uploading gradient texture");
-            Texture3D texture = new Texture3D(dimX, dimY, dimZ, texformat, false);
+            Texture2D texture = new Texture2D(dimX * dimZX, dimY * dimZY, texformat, false);
             texture.wrapMode = TextureWrapMode.Clamp;
             texture.SetPixels(cols);
             texture.Apply(false, true);
