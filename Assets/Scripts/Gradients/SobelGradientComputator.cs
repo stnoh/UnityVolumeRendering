@@ -33,7 +33,21 @@ namespace UnityVolumeRendering
 
         private float GetData(int x, int y, int z)
         {
-            return data[x + y * dimX + z * (dimX * dimY)];
+            /*
+            int dimZX = (int)Math.Sqrt(dimZ);
+            //int dimZY = (dimZ + dimZX - 1) / dimZX;
+
+            int bx = z % dimZX;
+            int by = z / dimZX;
+
+            //int i = x + y * dimX + z * (dimX * dimY);
+            int u = x + bx * dimX;
+            int v = y + by * dimY;
+            int idx = u + v * dimX * dimZX;
+            return data[idx];
+            //*/
+
+            return data[x + y * dimX + z * (dimX * dimY)]; // default
         }
 
         private Vector3 ConvolveWithKernels(int x, int y, int z)
